@@ -1,0 +1,21 @@
+{% extends "base.html" %} 
+{% block content %}
+<main>
+  <section class="container my-5 px-4 text-center">
+    <h1 class="text-center"><span style="color:red">Ya</span>Cut</h1>
+    <p class="text-center my-4 fs-4 text-muted">
+      Ошибка сервера (500)
+    </p>
+
+    <div class="container my-5">
+      <div class="row justify-content-center">
+        <div class="col-md-6">
+          <p class="mb-4">На сервере произошла непредвиденная ошибка. Пожалуйста, попробуйте повторить попытку позже.</p>
+          <a href="{{ url_for('index_view') }}" class="btn btn-primary btn-lg">Вернуться на главную</a>
+        </div>
+      </div>
+    </div>
+
+  </section>
+</main>
+{% endblock %}
