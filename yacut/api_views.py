@@ -1,11 +1,12 @@
 import re
+from http import HTTPStatus
 
 from flask import jsonify, request, url_for
 
-from . import app, db
+from . import app
 from .error_handlers import InvalidAPIUsage
 from .models import URLMap
-from .views import get_unique_short_id
+from .utils import check_and_generate_short_link, save_url_map
 
 MAX_SHORT_LINK_LENGTH = 16
 
@@ -23,7 +24,7 @@ def add_short_link():
 
     if custom_id:
         if (
-            len(custom_id) > 16 or
+            len(custom_id) > MAX_SHORT_LINK_LENGTH or
             not re.match(r'^[A-Za-z0-9]+$', custom_id) or
             custom_id == 'files'
         ):
@@ -38,17 +39,9 @@ def add_short_link():
 
         short_id = custom_id
     else:
-        while True:
-            short_id = get_unique_short_id()
-            if (
-                short_id != 'files'
-                and not URLMap.query.filter_by(short=short_id).first()
-            ):
-                break
+        short_id = check_and_generate_short_link()
 
-    new_url = URLMap(original=original_url, short=short_id)
-    db.session.add(new_url)
-    db.session.commit()
+    new_url = save_url_map(short_id, original_url)
     return jsonify(
         {
             'url': new_url.original,
@@ -58,12 +51,12 @@ def add_short_link():
                 _external=True
             ),
         }
-    ), 201
+    ), HTTPStatus.CREATED
 
 
 @app.route('/api/id/<short_id>/', methods=['GET'])
 def get_og_link(short_id):
     url_map = URLMap.query.filter_by(short=short_id).first()
     if not url_map:
-        raise InvalidAPIUsage('Указанный id не найден', 404)
-    return jsonify({'url': url_map.original}), 200
+        raise InvalidAPIUsage('Указанный id не найден', HTTPStatus.NOT_FOUND)
+    return jsonify({'url': url_map.original}), HTTPStatus.OK

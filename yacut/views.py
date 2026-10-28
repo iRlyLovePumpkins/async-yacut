@@ -1,21 +1,14 @@
-from random import choice
-from string import ascii_letters, digits
+from http import HTTPStatus
 from urllib.parse import parse_qs, urlparse
 
 import requests
 from flask import Response, flash, redirect, render_template
 
-from . import app, db
+from . import app
 from .forms import AddFilesForm, ChangeLinkForm
 from .models import URLMap
+from .utils import check_and_generate_short_link, save_url_map
 from .yandex_disk import async_upload_files_to_yandex_disk
-
-
-def get_unique_short_id():
-    char_pool = ascii_letters + digits
-    length = 6
-    result = "".join(choice(char_pool) for _ in range(length))
-    return result
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -34,19 +27,9 @@ def index_view():
                 flash('Предложенный вариант короткой ссылки уже существует.')
                 return render_template('index.html', form=form)
         else:
-            while True:
-                short_id = get_unique_short_id()
-                if (
-                    short_id != 'files'
-                    and not URLMap.query.filter_by(short=short_id).first()
-                ):
-                    break
-        new_url = URLMap(
-            original=original_url,
-            short=short_id
-        )
-        db.session.add(new_url)
-        db.session.commit()
+            short_id = check_and_generate_short_link()
+
+        new_url = save_url_map(short_id, original_url)
         return render_template('index.html', form=form, new_url=new_url)
     return render_template('index.html', form=form)
 
@@ -61,8 +44,8 @@ def redirect_view(short_id):
     ):
         yandex_response = requests.get(url_map.original, stream=True)
 
-        if yandex_response.status_code != 200:
-            return 'File not found or expired on storage', 404
+        if yandex_response.status_code != HTTPStatus.OK:
+            return 'File not found or expired on storage', HTTPStatus.NOT_FOUND
 
         parsed_url = urlparse(url_map.original)
         query_params = parse_qs(parsed_url.query)
@@ -81,7 +64,7 @@ def redirect_view(short_id):
             },
         )
 
-    return redirect(url_map.original, code=302)
+    return redirect(url_map.original, code=HTTPStatus.FOUND)
 
 
 @app.route('/files', methods=['GET', 'POST'])
@@ -99,15 +82,7 @@ async def files_view():
         if not download_url:
             continue
 
-        while True:
-            short_id = get_unique_short_id()
-            if (
-                short_id != 'files'
-                and not URLMap.query.filter_by(short=short_id).first()
-            ):
-                break
-        new_url = URLMap(original=download_url, short=short_id)
-        db.session.add(new_url)
-        db.session.commit()
+        short_id = check_and_generate_short_link()
+        save_url_map(short_id, download_url)
         result_files.append({'filename': filename, 'short': short_id})
     return render_template('files.html', form=form, result_files=result_files)

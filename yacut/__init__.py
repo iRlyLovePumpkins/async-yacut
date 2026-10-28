@@ -9,7 +9,10 @@ app.config.from_object(Config)
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
-from . import api_views, error_handlers, forms, models, views, yandex_disk
+from . import (
+    api_views, error_handlers, forms,
+    models, utils, views, yandex_disk
+)
 
 with app.app_context():
     db.create_all()
